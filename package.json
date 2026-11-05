@@ -1,0 +1,19 @@
+{
+  "name": "request",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "统一请求层：零依赖 core + 按需导入的 adapter 插件（axios / uni-app）",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "axios": "^1.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
