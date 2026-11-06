@@ -133,22 +133,42 @@ function toRequestError(error: unknown, config?: RequestConfig): RequestError {
  *   // 返回 RawResponse；取消时抛 name='AbortError' 的错误
  * }).use(withRetry()).use(withDedupe())   // 注册顺序 = 请求流经顺序
  *
+ * 平台特有方法（如 upload/downloadFile）用 .extend 附加：
+ *   .extend((request) => ({ upload: (file) => ... }))
+ * 工厂收到"组合后的适配器"，附加方法可路由完整管道，并在后续 .use 链上保持不丢。
+ *
  * 返回值本身仍是合法的 RequestAdapter，可直接传给 createRequest。
  */
 export function defineAdapter(adapter: RequestAdapter): ChainableAdapter {
-  const chain = (enhancers: AdapterEnhancer[]): ChainableAdapter => {
+  const chain = <T extends object>(
+    enhancers: AdapterEnhancer[],
+    extras: T,
+  ): ChainableAdapter<T> => {
     let composed: RequestAdapter | undefined
-    const wrapped = ((config: RequestConfig) => {
+    const getComposed = (): RequestAdapter => {
       // 惰性组合并缓存：装饰器工厂只在首次请求时执行一次，.use 不触发重建
       if (composed === undefined) {
         composed = enhancers.reduceRight((acc, enhance) => enhance(acc), adapter)
       }
-      return composed(config)
-    }) as ChainableAdapter
-    wrapped.use = (enhancer) => chain([...enhancers, enhancer])
+      return composed
+    }
+
+    const wrapped = ((config: RequestConfig) =>
+      getComposed()(config)) as ChainableAdapter<T>
+    wrapped.use = (enhancer) => chain([...enhancers, enhancer], extras)
+    wrapped.extend = (<U extends object>(
+      factory: (composed: RequestAdapter) => U,
+    ) => {
+      // extras 工厂以"当前已组合的适配器"执行一次，附加方法天然带上此前注册的装饰器
+      const added = factory((config) => getComposed()(config))
+      return chain([...enhancers], { ...extras, ...added })
+    }) as ChainableAdapter<T>['extend']
+    for (const [key, value] of Object.entries(extras)) {
+      ;(wrapped as unknown as Record<string, unknown>)[key] = value
+    }
     return wrapped
   }
-  return chain([])
+  return chain([], {})
 }
 
 export function createRequest(options: CreateRequestOptions): RequestInstance {

@@ -20,7 +20,7 @@
 - [适配器装饰器](#适配器装饰器)
   - [组合：use 链](#组合use-链) / [withRetry](#withretry) / [withDedupe](#withdedupe) / [幂等性默认](#幂等性默认)
 - [适配器](#适配器)
-  - [选型](#选型) / [能力矩阵](#能力矩阵) / [uni-app 平台选择](#uni-app-平台选择) / [自定义适配器](#自定义适配器)
+  - [选型](#选型) / [能力矩阵](#能力矩阵) / [uni-app 平台选择](#uni-app-平台选择) / [自定义适配器](#自定义适配器) / [extend：附加平台方法](#extend附加平台方法)
 - [进阶](#进阶)
   - [统一取消](#统一取消) / [事件](#事件) / [adapterOptions 透传](#adapteroptions-透传)
 - [设计决策](#设计决策)
@@ -458,6 +458,38 @@ const http = createRequest({ adapter: myAdapter.use(withRetry()) })
 ```
 
 可运行的完整示例见 `tests/custom-adapter.test.ts`（一个与内置 `adapters/fetch.ts` 同构的 fetch 实现）。
+
+### extend：附加平台方法
+
+适配器可携带平台特有方法（如小程序的 `uploadFile`）。`.extend` 的工厂收到**组合后的适配器**，
+附加方法可路由完整管道（此前的拦截器/装饰器都生效），并在后续 `.use` 链上保持不丢：
+
+```ts
+import { uniappAdapter } from './src/adapters/uniapp'
+import { withRetry } from './src/enhancers/retry'
+
+const mp = uniappAdapter
+  .use(withRetry({ methods: ['GET', 'POST'] }))
+  .extend((request) => ({
+    upload: (filePath: string, url: string) =>
+      new Promise((resolve, reject) => {
+        uni.uploadFile({
+          url,
+          filePath,
+          name: 'file',
+          success: (res) => resolve({ status: res.statusCode, data: res.data, headers: {} }),
+          fail: reject,
+        })
+      }),
+  }))
+
+await mp.post('/x', {})              // 统一面不变
+await mp.upload('/a.png', uploadUrl) // 平台特有方法（已带 retry）
+```
+
+语义：工厂以 `extend` 调用时刻的组合执行一次——要让附加方法也享受某个装饰器，**先 `.use` 再
+`.extend`**；之后对同一对象的 `.use` 不影响已附加方法。自定义适配器同样支持
+（`defineAdapter(fn).extend(...)`）。附加方法不要命名为 `use` / `extend`。
 
 ## 进阶
 

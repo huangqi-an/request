@@ -94,13 +94,25 @@ export type RequestAdapter = (config: RequestConfig) => Promise<RawResponse>
 export type AdapterEnhancer = (adapter: RequestAdapter) => RequestAdapter
 
 /**
- * 可链式增强的 adapter：本身可直接当 RequestAdapter 用，同时提供 .use 叠加装饰器。
- * 注册顺序 = 请求流经顺序（与拦截器链一致）：adapter.use(a).use(b) 时请求依次经过 a → b → adapter。
+ * 可链式增强的适配器：本身可直接当 RequestAdapter 用。
+ * - use：叠加装饰器（注册顺序 = 请求流经顺序）
+ * - extend：附加平台特有方法（如 upload / downloadFile）。工厂收到"组合后的适配器"，
+ *   附加方法可路由完整管道（拦截器/装饰器）；附加方法在后续 .use 链上保持不丢
+ *
+ * T 为已附加方法的类型形状（defineAdapter 默认为空）。
  */
-export interface ChainableAdapter extends RequestAdapter {
-  /** 在外层叠加一个装饰器，返回新的链式 adapter（原 adapter 不被修改） */
-  use: (enhancer: AdapterEnhancer) => ChainableAdapter
-}
+export type ChainableAdapter<T extends object = object> = RequestAdapter &
+  T & {
+    /** 在外层叠加一个装饰器，返回新的链式适配器（原适配器不被修改） */
+    use: (enhancer: AdapterEnhancer) => ChainableAdapter<T>
+    /**
+     * 附加平台特有方法。工厂以当前已组合的适配器执行一次——
+     * 附加方法天然带上此前注册的装饰器；之后的 .use 不影响已附加方法（先 use 后 extend）。
+     */
+    extend: <U extends object>(
+      factory: (composed: RequestAdapter) => U,
+    ) => ChainableAdapter<T & U>
+  }
 
 /** 请求拦截器：返回新 config（可异步） */
 export type RequestInterceptor = (

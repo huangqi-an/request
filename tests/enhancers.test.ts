@@ -242,3 +242,49 @@ describe('adapter 链式增强（.use）', () => {
     expect(calls).toBe(2)
   })
 })
+
+describe('extend（附加平台特有方法）', () => {
+  it('工厂收到组合后的适配器：附加方法可路由完整管道（含 retry）', async () => {
+    let calls = 0
+    const flaky: RequestAdapter = vi.fn(async () => {
+      calls++
+      if (calls === 1) throw new Error('flaky')
+      return rawResponse({ data: { ok: 1 } })
+    })
+    const enhanced = defineAdapter(flaky)
+      .use(withRetry({ methods: ['GET', 'POST'] }))
+      .extend((request) => ({
+        upload: (name: string) => request({ url: `/upload/${name}`, method: 'POST' }),
+      }))
+    const res = await enhanced.upload('a.png')
+    expect(res.data).toEqual({ ok: 1 })
+    expect(calls).toBe(2) // 附加方法走了 retry 管道
+  })
+
+  it('附加方法在 .use 链上保持不丢，且可继续叠加', async () => {
+    const enhanced = defineAdapter(async () => rawResponse())
+      .extend(() => ({ upload: () => 'u' as const, version: 1 }))
+    const withDedupeChain = enhanced.use(withDedupe())
+    expect(withDedupeChain.upload()).toBe('u')
+    expect(withDedupeChain.version).toBe(1)
+    const more = withDedupeChain.extend(() => ({ download: () => 'd' as const }))
+    expect(more.upload()).toBe('u')
+    expect(more.version).toBe(1)
+    expect(more.download()).toBe('d')
+  })
+
+  it('extend 之前的装饰器作用于附加方法，之后的 .use 不影响已附加方法', async () => {
+    let calls = 0
+    const base = defineAdapter(async () => {
+      calls++
+      return rawResponse()
+    })
+    // extend 在 use 之前：工厂拿到的是"未带 dedupe 的组合"
+    const extended = base.extend((request) => ({
+      upload: () => request({ url: '/u', method: 'POST' }),
+    }))
+    const withDedupeChain = extended.use(withDedupe())
+    await Promise.all([withDedupeChain.upload(), withDedupeChain.upload()])
+    expect(calls).toBe(2) // 文档语义：先 use 后 extend，附加方法才享受装饰器
+  })
+})
