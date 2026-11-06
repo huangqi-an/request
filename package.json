@@ -1,5 +1,5 @@
 {
-  "name": "@huangqi-an/request",
+  "name": "@huangqi_an/request",
   "version": "0.1.0",
   "description": "统一请求层：零依赖 core + 按需导入的 adapter 插件（fetch / axios / uni-app）",
   "type": "module",

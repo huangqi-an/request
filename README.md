@@ -6,7 +6,7 @@
 - **统一语义**：状态码判断、错误四分类、取消、超时、进度、拦截器——三端行为完全一致
 - **可扩展**：自定义适配器只需一个函数契约；事件（`RequestEvents`）与平台专有参数（`adapterOptions`）都有封闭的扩展点
 
-> 适用形态：npm 包（`@huangqi-an/request`）或源码直引（拷贝 `src/`），零构建。
+> 适用形态：npm 包（`@huangqi_an/request`）或源码直引（拷贝 `src/`），零构建。
 > 本文档描述当前实现，`npm run test` 的 86 个用例即文档行为快照。
 
 ## 目录
@@ -33,13 +33,13 @@
 **npm（推荐）**：
 
 ```bash
-npm install @huangqi-an/request
+npm install @huangqi_an/request
 # 仅使用 axiosAdapter 时需要自备 axios（optional peer dependency）：
 npm install axios
 ```
 
 **源码直引**：把 `src/` 拷进项目（或作为 monorepo 共享包引入），零构建；
-本文示例中的 `@huangqi-an/request/...` 换成相对路径（如 `./src`）即可。
+本文示例中的 `@huangqi_an/request/...` 换成相对路径（如 `./src`）即可。
 
 ### 2. 创建实例并发请求（Web / Node / SSR）
 
