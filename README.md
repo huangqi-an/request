@@ -25,7 +25,7 @@ src/
 │   └── dedupe.ts   # withDedupe：进行中请求共享
 └── adapters/       # 平台 adapter 插件（真正发请求的那层），一律按需导入
     ├── fetch.ts    # 全局 fetch（Web/Node/SSR，零依赖）
-    ├── pc.ts       # axios（Web 端，需要 axios 生态时用）
+    ├── axios.ts       # axios（Web 端，需要 axios 生态时用）
     └── uniapp.ts   # uni.request（uni-app 端：H5 / 小程序 / App 通用）
 ```
 
@@ -41,7 +41,7 @@ import { createRequest, defineAdapter } from './src'
 
 ### 2. 选择一个 adapter（按需导入）
 
-Web 端二选一：默认用零依赖的 `fetchAdapter`；需要 axios 生态（成熟拦截器插件、上传进度事件、老旧浏览器兼容）时用 `pcAdapter`。uni-app 项目用 `uniappAdapter`。
+Web 端二选一：默认用零依赖的 `fetchAdapter`；需要 axios 生态（成熟拦截器插件、上传进度事件、老旧浏览器兼容）时用 `axiosAdapter`。uni-app 项目用 `uniappAdapter`。
 
 ```ts
 // Web/Node/SSR：零依赖 fetch（Node 18+ / 现代浏览器）
@@ -58,11 +58,11 @@ const http = createRequest({
 
 ```ts
 // Web 端：adapter 插件自带 axios 依赖
-import { pcAdapter } from './src/adapters/pc'
+import { axiosAdapter } from './src/adapters/axios'
 import { createRequest } from './src'
 
 const http = createRequest({
-  adapter: pcAdapter,
+  adapter: axiosAdapter,
   baseURL: 'https://api.example.com',
   timeout: 15000,
   headers: { 'X-Client': 'web' },
@@ -78,13 +78,13 @@ const http = createRequest({ adapter: uniappAdapter, baseURL: 'https://api.examp
 ```
 
 未被 import 的 adapter 模块不会进 bundle——解耦靠模块结构，不靠注释自觉。
-平台选择属于应用层：纯 Web 直接用 `pcAdapter`；uni-app 用条件编译分别创建实例
+平台选择属于应用层：纯 Web 直接用 `axiosAdapter`；uni-app 用条件编译分别创建实例
 （路径按你放置 `src/` 的位置调整）：
 
 ```ts
 // #ifdef H5
-import { pcAdapter } from '@/request/adapters/pc'
-export const http = createRequest({ adapter: pcAdapter })
+import { axiosAdapter } from '@/request/adapters/axios'
+export const http = createRequest({ adapter: axiosAdapter })
 // #endif
 // #ifdef MP-WEIXIN
 import { uniappAdapter } from '@/request/adapters/uniapp'
@@ -133,7 +133,7 @@ const http = createRequest({ adapter: fetchAdapter })
 
 ```ts
 import { createRequest } from './src'
-import { pcAdapter } from './src/adapters/pc'
+import { axiosAdapter } from './src/adapters/axios'
 import { withRetry } from './src/enhancers/retry'
 import { withDedupe } from './src/enhancers/dedupe'
 import {
@@ -146,7 +146,7 @@ import {
 const http = createRequest({
   // .use：从上到下 = 请求流经顺序 —— 先去重（合并并发），再去重窗口内重试；
   // 重试/去重发生在 adapter 层，重试成功的响应正常走完整管道（响应链剥壳等）
-  adapter: pcAdapter.use(withDedupe()).use(withRetry({ retries: 2 })),
+  adapter: axiosAdapter.use(withDedupe()).use(withRetry({ retries: 2 })),
   baseURL: 'https://api.example.com',
 })
 
@@ -278,6 +278,64 @@ http.get('/heavy-report', { signal: controller.signal }).catch(() => {})
 controller.abort() // axios：原生取消；uni.request：桥接到 task.abort()；fetch：原生取消
 ```
 
+### 9. 事件（进度等）
+
+事件通过 `config.on` 订阅（与 axios 习惯对齐），进度事件统一为 `{ loaded, total?, progress? }`：
+
+```ts
+await http.post('/upload', formData, {
+  on: {
+    uploadProgress: ({ progress }) => bar.update(progress),   // 0-1
+  },
+})
+await http.get('/big-file', {
+  on: {
+    downloadProgress: ({ loaded, total }) => console.log(loaded, total),
+  },
+})
+```
+
+**扩展策略**：`on` 是事件的唯一入口——以后新增事件（如 `headersReceived`、`chunkReceived`、`retry`）
+只扩展 `RequestEvents` 接口并在对应 adapter 中 emit，`RequestConfig` 结构保持封闭，不再往根上加回调字段。
+
+能力矩阵（平台差异在 adapter 内抹平，做不到的静默不触发）：
+
+| adapter | 上传进度 | 下载进度 | 说明 |
+| --- | --- | --- | --- |
+| `axiosAdapter` | ✓ | ✓ | axios 1.x 浏览器 XHR 与 Node 流式适配器均支持 |
+| `uniappAdapter` | ✓ | ✓ | `task.onProgressUpdate` 归一化（旧基础库缺失该 API 时跳过） |
+| `fetchAdapter` | ✗ | ✓ | fetch 无上传进度（平台限制）；下载走 `res.body` 流式读取，`Content-Length` 缺失时 `total/progress` 为 undefined |
+
+事件随 config 流经请求链，拦截器也能统一注入（如全局埋点）；每个并发调用者拿到各自的事件，不因去重共享而互相影响。
+
+### 10. adapter 专有配置透传（adapterOptions）
+
+平台特有参数（如 axios 的 `adapter`、fetch 的 `credentials`、uni.request 的 `enableHttp2`）
+不进 `RequestConfig` 根——统一走 `adapterOptions` 逃生舱，按 adapter 名取用、仅对应 adapter 消费：
+
+```ts
+// 让 axios 走它自己的 fetch 适配器（axios 1.7+）
+await http.get('/x', { adapterOptions: { axios: { adapter: 'fetch' } } })
+
+// fetch 携带 cookie / 控制缓存
+await http.get('/me', { adapterOptions: { fetch: { credentials: 'include', cache: 'no-store' } } })
+
+// 自定义 adapter 按自己的名字取用
+await http.get('/x', { adapterOptions: { myAdapter: { foo: 1 } } })
+```
+
+冲突规则：`url / method / headers / timeout / signal / validateStatus` 等契约派生字段
+始终以 `RequestConfig` 为准，透传项覆盖不了它们——统一语义（状态码判断、取消、超时）不会被破坏。
+
+实例级默认透传用请求拦截器即可，不需要额外 API：
+
+```ts
+http.interceptors.request.use((config) => ({
+  ...config,
+  adapterOptions: { ...config.adapterOptions, axios: { adapter: 'fetch' } },
+}))
+```
+
 ## 设计决策
 
 | 决策 | 原因 |
@@ -304,6 +362,6 @@ npm run typecheck  # tsc --noEmit
 ```
 
 - `tests/core.test.ts`：mock adapter，覆盖配置合并/拦截器顺序/params 拼接/错误三分类/拦截器恢复（同时验证门面零依赖可用）
-- `tests/adapter.pc.test.ts`：真实 axios 打本地 `node:http` echo server
+- `tests/adapter.axios.test.ts`：真实 axios 打本地 `node:http` echo server
 - `tests/adapter.uniapp.test.ts`：注入 fake `globalThis.uni` 模拟 uni.request 回调，覆盖成功/失败/取消/监听器清理
 - `tests/custom-adapter.test.ts`：测试内手写 fetch adapter 接入，证明契约可独立实现

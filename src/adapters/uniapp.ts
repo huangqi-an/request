@@ -1,10 +1,31 @@
 import { defineAdapter } from '../core'
 import { createAbortError } from '../errors'
-import type { RawResponse, RequestConfig } from '../types'
+import type { RawResponse, RequestConfig, RequestProgress } from '../types'
+
+/** 归一化 uni 进度事件（progress 0-100 → 0-1）：total 缺失/为 0 时 progress 为 undefined */
+function toProgress(loaded: number, total?: number): RequestProgress {
+  const t = total && total > 0 ? total : undefined
+  return {
+    loaded,
+    total: t,
+    progress: t !== undefined ? Math.min(loaded / t, 1) : undefined,
+  }
+}
 
 /** uni.request 的最小类型声明（按需扩展） */
+interface UniProgressInfo {
+  /** 0-100 */
+  progress: number
+  totalBytesSent: number
+  totalBytesExpectedToSend: number
+  totalBytesReceived: number
+  totalBytesExpectedToReceive: number
+}
+
 interface UniRequestTask {
   abort(): void
+  /** 进度监听为可选能力（旧基础库可能没有） */
+  onProgressUpdate?(callback: (res: UniProgressInfo) => void): void
 }
 
 interface UniRequestOptions {
@@ -79,6 +100,8 @@ export const uniappAdapter = defineAdapter((config: RequestConfig) => {
 
     try {
       task = uni.request({
+        // 专有配置先展开（如 enableHttp2）：契约派生字段在后覆盖
+        ...(config.adapterOptions?.uniapp as Record<string, unknown> | undefined),
         url: config.url,
         method: config.method,
         data: config.data,
@@ -101,6 +124,21 @@ export const uniappAdapter = defineAdapter((config: RequestConfig) => {
           settleFail(err ?? new Error('request:fail'))
         },
       })
+
+      // 进度回调注册（task.onProgressUpdate 为可选能力，缺失时静默跳过）
+      if (task?.onProgressUpdate) {
+        const { uploadProgress, downloadProgress } = config.on ?? {}
+        if (uploadProgress) {
+          task.onProgressUpdate((res) =>
+            uploadProgress(toProgress(res.totalBytesSent, res.totalBytesExpectedToSend)),
+          )
+        }
+        if (downloadProgress) {
+          task.onProgressUpdate((res) =>
+            downloadProgress(toProgress(res.totalBytesReceived, res.totalBytesExpectedToReceive)),
+          )
+        }
+      }
     } catch (error) {
       settleFail(error)
     }

@@ -11,6 +11,37 @@ export type RequestMethod =
   | 'OPTIONS'
 
 /**
+ * 请求事件集合：adapter 在支持的平台能力上触发。
+ * 扩展策略：新增事件只加这里的可选成员（并在对应 adapter 中 emit），
+ * RequestConfig 结构保持封闭——不再往根上加回调字段。
+ */
+export interface RequestEvents {
+  /** 上传进度（字节数）；axios/uniapp 支持，fetch 平台不支持（README 有能力矩阵） */
+  uploadProgress?: (progress: RequestProgress) => void
+  /** 下载进度（字节数）；fetch 走流式读取，Content-Length 缺失时 total/progress 为 undefined */
+  downloadProgress?: (progress: RequestProgress) => void
+}
+
+/**
+ * adapter 专有配置透传袋：按 adapter 名取用，仅对应 adapter 消费，其它 adapter 忽略。
+ * 这是平台特有能力的统一逃生舱（如 axios 的 adapter/responseType、fetch 的 credentials/cache、
+ * uni.request 的 enableHttp2）——RequestConfig 保持平台无关，特有参数走这里，不往根上加字段。
+ *
+ * 冲突规则：契约派生字段（url/method/headers/timeout/signal/validateStatus 等）
+ * 以 RequestConfig 为准，透传项覆盖不了它们——统一语义不被破坏。
+ */
+export interface AdapterOptions {
+  /** axiosAdapter 透传给 axios.request 的额外配置（axios 专有类型见 axios 官方文档） */
+  axios?: Record<string, unknown>
+  /** uniappAdapter 透传给 uni.request 的额外配置 */
+  uniapp?: Record<string, unknown>
+  /** fetchAdapter 透传给 fetch() 的额外配置（credentials / cache / redirect 等） */
+  fetch?: Record<string, unknown>
+  /** 自定义 adapter 可按自己的名字扩展（结构由该 adapter 决定） */
+  [adapter: string]: Record<string, unknown> | undefined
+}
+
+/**
  * 平台无关的请求配置，adapter 的唯一输入。
  * 注意：adapter 拿到的 url 已经是 core 拼好 params 的完整地址。
  */
@@ -24,6 +55,10 @@ export interface RequestConfig {
   headers?: Record<string, string>
   timeout?: number
   signal?: AbortSignal
+  /** 事件订阅（唯一的扩展点：新增事件只扩展 RequestEvents，不改 RequestConfig） */
+  on?: RequestEvents
+  /** adapter 专有配置透传（见 AdapterOptions） */
+  adapterOptions?: AdapterOptions
 }
 
 /**
@@ -38,6 +73,15 @@ export interface RawResponse<T = unknown> {
   durationMs?: number
   /** 发起请求的最终配置（url 已拼好 params），core 注入；供响应链做条件逻辑 */
   config?: RequestConfig
+}
+
+/** 进度事件：loaded/total 为字节数，progress 为 0-1（total 未知时为 undefined） */
+export interface RequestProgress {
+  loaded: number
+  /** 总字节数；服务端未返回长度（chunked 等）时为 undefined */
+  total?: number
+  /** 0-1；total 未知时为 undefined */
+  progress?: number
 }
 
 /**

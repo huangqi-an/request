@@ -12,7 +12,7 @@ import type {
 } from './types'
 
 export interface CreateRequestOptions {
-  /** 必传：adapter 插件（pcAdapter / uniappAdapter / 自定义 adapter / 测试 mock） */
+  /** 必传：adapter 插件（axiosAdapter / fetchAdapter / uniappAdapter / 自定义 / 测试 mock） */
   adapter: RequestAdapter
   baseURL?: string
   headers?: Record<string, string>

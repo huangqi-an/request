@@ -6,7 +6,7 @@ import { createRequest } from '../src'
  * uni-app 端无法在本机真跑，注入 fake globalThis.uni 模拟 uni.request 的回调行为。
  */
 function setupUni() {
-  const task = { abort: vi.fn() }
+  const task = { abort: vi.fn(), onProgressUpdate: vi.fn() }
   let handlers: {
     success?: (res: { statusCode: number; data: unknown; header?: Record<string, string> }) => void
     fail?: (err: { errMsg?: string }) => void
@@ -141,5 +141,63 @@ describe('uniappAdapter（fake globalThis.uni）', () => {
     const err = await pending
     expect(err.kind).toBe('http')
     expect(err.status).toBe(500)
+  })
+
+  it('进度回调：onProgressUpdate 归一化为 loaded/total/progress', async () => {
+    const u = setupUni()
+    const on = { uploadProgress: vi.fn(), downloadProgress: vi.fn() }
+    const pending = uniappAdapter({
+      url: 'https://api.example.com/upload',
+      method: 'POST',
+      data: { a: 1 },
+      on,
+    })
+    // 上传 + 下载各注册一次
+    expect(u.task.onProgressUpdate).toHaveBeenCalledTimes(2)
+    const uploadCb = u.task.onProgressUpdate.mock.calls[0]![0]
+    const downloadCb = u.task.onProgressUpdate.mock.calls[1]![0]
+    uploadCb({
+      progress: 50,
+      totalBytesSent: 50,
+      totalBytesExpectedToSend: 100,
+      totalBytesReceived: 0,
+      totalBytesExpectedToReceive: 0,
+    })
+    downloadCb({
+      progress: 80,
+      totalBytesSent: 100,
+      totalBytesExpectedToSend: 100,
+      totalBytesReceived: 80,
+      totalBytesExpectedToReceive: 100,
+    })
+    u.succeed({ statusCode: 200, data: { ok: 1 } })
+    await pending
+    expect(on.uploadProgress).toHaveBeenCalledWith({ loaded: 50, total: 100, progress: 0.5 })
+    expect(on.downloadProgress).toHaveBeenCalledWith({ loaded: 80, total: 100, progress: 0.8 })
+  })
+
+  it('未提供进度回调时不注册 onProgressUpdate', async () => {
+    const u = setupUni()
+    const pending = uniappAdapter({ url: 'https://api.example.com/x' })
+    u.succeed({ statusCode: 200 })
+    await pending
+    expect(u.task.onProgressUpdate).not.toHaveBeenCalled()
+  })
+
+  it('adapterOptions 透传：额外参数进入 uni.request 且契约字段不受影响', async () => {
+    const u = setupUni()
+    const pending = uniappAdapter({
+      url: 'https://api.example.com/x',
+      method: 'POST',
+      adapterOptions: { uniapp: { enableHttp2: true, forceCellularNetwork: true } },
+    })
+    expect(u.request.mock.calls[0]![0]).toMatchObject({
+      url: 'https://api.example.com/x',
+      method: 'POST',
+      enableHttp2: true,
+      forceCellularNetwork: true,
+    })
+    u.succeed({ statusCode: 200 })
+    await pending
   })
 })

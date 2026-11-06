@@ -1,6 +1,7 @@
 import { createServer, type Server } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createRequest, RequestError } from '../src'
+import type { RequestProgress } from '../src'
 import { fetchAdapter } from '../src/adapters/fetch'
 
 let server: Server
@@ -20,6 +21,27 @@ beforeAll(async () => {
     }
     if (req.url === '/text') {
       respond(200, { 'Content-Type': 'text/plain' }, 'plain-text-body')
+      return
+    }
+    if (req.url === '/download') {
+      const body = 'x'.repeat(1000)
+      respond(
+        200,
+        { 'Content-Type': 'application/octet-stream', 'Content-Length': String(body.length) },
+        body,
+      )
+      return
+    }
+    if (req.url === '/chunked') {
+      // 不设 Content-Length → chunked 传输，下载进度无 total
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.write('hello-')
+      res.end('world')
+      return
+    }
+    if (req.url === '/redirect') {
+      res.writeHead(301, { Location: '/echo' })
+      res.end()
       return
     }
     let raw = ''
@@ -115,5 +137,45 @@ describe('fetchAdapter（全局 fetch → 本地 http server）', () => {
     const err = await http.get('/slow', { timeout: 50 }).catch((e) => e)
     expect(err.kind).toBe('network')
     expect(err.message).toContain('timed out')
+  })
+
+  it('下载进度：流式读取，Content-Length 已知时带 total/progress', async () => {
+    const events: RequestProgress[] = []
+    const res = await fetchAdapter({
+      url: `${baseURL}/download`,
+      on: { downloadProgress: (p) => events.push(p) },
+    })
+    expect(res.data).toBe('x'.repeat(1000))
+    expect(events.length).toBeGreaterThan(0)
+    const last = events[events.length - 1]!
+    expect(last.total).toBe(1000)
+    expect(last.loaded).toBe(1000)
+    expect(last.progress).toBe(1)
+  })
+
+  it('下载进度：chunked 无 Content-Length 时 total/progress 为 undefined', async () => {
+    const events: RequestProgress[] = []
+    const res = await fetchAdapter({
+      url: `${baseURL}/chunked`,
+      on: { downloadProgress: (p) => events.push(p) },
+    })
+    expect(res.data).toBe('hello-world')
+    expect(events.length).toBeGreaterThan(0)
+    const last = events[events.length - 1]!
+    expect(last.loaded).toBe(11)
+    expect(last.total).toBeUndefined()
+    expect(last.progress).toBeUndefined()
+  })
+
+  it('adapterOptions 透传：redirect: manual 生效（默认会跟随重定向）', async () => {
+    // 对照：默认跟随重定向，最终落在 /echo
+    const followed = await fetchAdapter({ url: `${baseURL}/redirect` })
+    expect(followed.status).toBe(200)
+    // redirect: 'manual' 透传给 fetch → 拿到 opaque redirect（status 0），不跟随
+    const manual = await fetchAdapter({
+      url: `${baseURL}/redirect`,
+      adapterOptions: { fetch: { redirect: 'manual' } },
+    })
+    expect(manual.status).not.toBe(200)
   })
 })
