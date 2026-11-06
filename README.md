@@ -152,16 +152,35 @@ const http = createRequest({ adapter: fetchAdapter, baseURL: '...' })
 
 | 方法 | 说明 |
 | --- | --- |
-| `request<T>(config)` | 全量配置发请求 |
+| `request<T>(config)` | 全量配置发请求，`method` 接受任意 `RequestMethod`（含 PATCH 等）——这是唯一必需的入口 |
 | `get<T>(url, config?)` | 快捷方法，`config` 中省略 url/method |
 | `post<T>(url, data?, config?)` | 同上，省略 url/method/data |
 | `put<T>(url, data?, config?)` | 同上 |
+| `patch<T>(url, data?, config?)` | 同上 |
 | `delete<T>(url, config?)` | 同上 |
 | `http.interceptors.request.use(fn)` | 注册请求链拦截器 |
 | `http.interceptors.response.use(fn)` | 注册响应链拦截器（成功转换） |
 | `http.interceptors.error.use(fn)` | 注册错误链拦截器 |
 
 全部请求方法返回 `Promise<RawResponse<T>>`。
+
+快捷方法只是 `request()` 的语法糖，你不调用就没有任何成本。需要**裁剪方法面**（如团队规范禁用
+DELETE）或自定义动词时，在业务层组合自己的 client 对象——库保持完整能力，导出面由你决定：
+
+```ts
+// src/api.ts —— 团队实际消费的入口
+import { createRequest } from './src'
+import { fetchAdapter } from './src/adapters/fetch'
+
+const base = createRequest({ adapter: fetchAdapter, baseURL: 'https://api.example.com' })
+
+export const api = {
+  get: base.get,
+  post: base.post,
+  patch: (url: string, data?: unknown) => base.request({ url, data, method: 'PATCH' }),
+}
+// 没有 put/delete：业务方拿不到，core 的任何语义不受影响
+```
 
 ### RequestConfig
 
@@ -395,6 +414,10 @@ const antiDoubleSubmit = fetchAdapter.use(withDedupe({ methods: ['POST'] })) // 
 | `axiosAdapter` | ✓ | ✓ | axios 1.x 浏览器 XHR 与 Node 流式适配器均支持 |
 | `uniappAdapter` | ✓ | ✓ | `task.onProgressUpdate` 归一化（旧基础库缺失该 API 时跳过） |
 | `fetchAdapter` | ✗ | ✓ | fetch 无上传进度（平台限制）；下载走 `res.body` 流式读取，`Content-Length` 缺失时 `total/progress` 为 undefined |
+
+> HTTP 动词备注：`method` 直接透传（`RequestMethod` 含全动词），但微信小程序端受 `wx.request`
+> 方法白名单限制（仅 OPTIONS/GET/HEAD/POST/PUT/DELETE/TRACE/CONNECT，**不含 PATCH**）——
+> mp 端需要 PATCH 时用 POST + 语义路径代替，或经 `adapterOptions: { uniapp: {...} }` 定制。
 
 ### uni-app 平台选择
 

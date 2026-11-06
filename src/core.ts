@@ -35,6 +35,11 @@ export interface RequestInstance {
     data?: unknown,
     config?: Omit<RequestConfig, 'url' | 'method' | 'data'>,
   ): Promise<RawResponse<T>>
+  patch<T = unknown>(
+    url: string,
+    data?: unknown,
+    config?: Omit<RequestConfig, 'url' | 'method' | 'data'>,
+  ): Promise<RawResponse<T>>
   delete<T = unknown>(
     url: string,
     config?: Omit<RequestConfig, 'url' | 'method'>,
@@ -225,6 +230,7 @@ export function createRequest(options: CreateRequestOptions): RequestInstance {
     get: (url, config) => request({ ...config, url, method: 'GET' }),
     post: (url, data, config) => request({ ...config, url, data, method: 'POST' }),
     put: (url, data, config) => request({ ...config, url, data, method: 'PUT' }),
+    patch: (url, data, config) => request({ ...config, url, data, method: 'PATCH' }),
     delete: (url, config) => request({ ...config, url, method: 'DELETE' }),
     interceptors: {
       request: {

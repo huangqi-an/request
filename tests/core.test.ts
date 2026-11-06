@@ -224,13 +224,15 @@ describe('createRequest', () => {
     expect(seen[0]!.kind).toBe('network')
   })
 
-  it('快捷方法 get/post/put/delete 的 method 与 data 正确', async () => {
+  it('快捷方法 get/post/put/patch/delete 的 method 与 data 正确', async () => {
     await ctx.http.post('/a', { x: 1 })
     await ctx.http.put('/b', { y: 2 })
+    await ctx.http.patch('/d', { z: 3 })
     await ctx.http.delete('/c')
     const calls = ctx.adapter.mock.calls as unknown as RequestConfig[][]
     expect(calls[0]![0]).toMatchObject({ url: 'https://api.example.com/a', method: 'POST', data: { x: 1 } })
     expect(calls[1]![0]).toMatchObject({ url: 'https://api.example.com/b', method: 'PUT', data: { y: 2 } })
-    expect(calls[2]![0]).toMatchObject({ url: 'https://api.example.com/c', method: 'DELETE' })
+    expect(calls[2]![0]).toMatchObject({ url: 'https://api.example.com/d', method: 'PATCH', data: { z: 3 } })
+    expect(calls[3]![0]).toMatchObject({ url: 'https://api.example.com/c', method: 'DELETE' })
   })
 })
