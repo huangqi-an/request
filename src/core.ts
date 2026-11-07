@@ -56,7 +56,8 @@ export interface RequestInstance {
   }
 }
 
-const ABSOLUTE_URL_RE = /^https?:\/\//
+// 绝对地址：http(s):// 与协议相对的 //host/path
+const ABSOLUTE_URL_RE = /^(https?:)?\/\//
 
 /**
  * 拼接 baseURL + url，并把 params 序列化为 query。

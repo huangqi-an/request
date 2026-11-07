@@ -38,10 +38,19 @@ describe('buildUrl', () => {
     )
   })
 
-  it('绝对 URL 忽略 baseURL', () => {
+  it('绝对 URL 忽略 baseURL（http 与 https 均可）', () => {
     expect(
       buildUrl('https://api.example.com', 'https://other.example.com/x'),
     ).toBe('https://other.example.com/x')
+    expect(
+      buildUrl('https://api.example.com', 'http://other.example.com/x'),
+    ).toBe('http://other.example.com/x')
+  })
+
+  it('协议相对 URL（//host/path）不与 baseURL 拼接', () => {
+    expect(
+      buildUrl('https://api.example.com', '//cdn.example.com/x'),
+    ).toBe('//cdn.example.com/x')
   })
 
   it('params 序列化：跳过 null/undefined，数组重复 key，encode 特殊字符', () => {
