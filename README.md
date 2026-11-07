@@ -6,7 +6,7 @@
 - 统一行为：状态码判定、错误分类（`abort` / `http` / `business` / `network`）、取消、超时、进度事件、拦截器
 - TypeScript 编写，含完整类型声明
 
-[完整 API 文档](https://github.com/huangqi-an/request/blob/main/docs/api.md) · [工作原理与设计决策](https://github.com/huangqi-an/request/blob/main/docs/design.md)
+[完整 API 文档](https://github.com/huangqi-an/request/blob/main/docs/api.md)
 
 ## 安装
 
