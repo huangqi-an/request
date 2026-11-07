@@ -1,6 +1,6 @@
 {
   "name": "@huangqi_an/request",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "统一请求层：零依赖 core + 按需导入的 adapter 插件（fetch / axios / uni-app）",
   "type": "module",
   "license": "MIT",
