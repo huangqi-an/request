@@ -65,6 +65,7 @@
   "files": [
     "dist"
   ],
+  "sideEffects": false,
   "engines": {
     "node": ">=18"
   },

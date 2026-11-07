@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-// 从零依赖门面导入，顺带验证 src/index.ts 不携带任何 adapter 依赖
+// 从统一门面导入：门面含契约 + 零依赖插件（fetch/拦截器/装饰器），不含 axios/uniapp 适配器
 import { buildUrl, createAbortError, createRequest, RequestError } from '../src'
 import type {
   CreateRequestOptions,

@@ -43,12 +43,15 @@ npm install axios
 
 ### 2. 创建实例并发请求（Web / Node / SSR）
 
+零依赖插件（`fetchAdapter`、全部拦截器、装饰器）都从主入口导入；只有 `axiosAdapter` /
+`uniappAdapter` 需要从子路径按需引入（它们分别耦合 axios 依赖与 `uni` 全局）。
+
 ```ts
-import { createRequest } from './src'
-import { fetchAdapter } from './src/adapters/fetch'
+import { createRequest, fetchAdapter, withRetry, withDedupe } from './src'
 
 export const http = createRequest({
-  adapter: fetchAdapter,                 // 零依赖；Node 18+ / 现代浏览器
+  // 常用装饰器组合一行组装；不需要时 adapter: fetchAdapter 即可
+  adapter: fetchAdapter.use(withDedupe()).use(withRetry()),
   baseURL: 'https://api.example.com',
   timeout: 15000,
   headers: { 'X-Client': 'web' },
@@ -122,14 +125,13 @@ core 判 2xx ──▶ 响应链拦截器（剥壳/转换）──▶ RawRespons
 | `src/enhancers/` | 包装 adapter 的装饰器（retry / dedupe） | `adapter.use()` |
 | `src/adapters/` | 平台发送实现（fetch / axios / uniapp） | `createRequest({ adapter })` |
 
-导入路径一览（门面 `src/index.ts` 只含契约，插件一律按需导入）：
+导入路径一览（门面 `src/index.ts` 含契约与零依赖插件；平台耦合的适配器从子路径按需导入）：
 
 | 需要什么 | 从哪导入 |
 | --- | --- |
 | `createRequest` / `defineAdapter` / 类型 / 错误 | `./src`（零依赖，任何端） |
-| 适配器 | `./src/adapters/{fetch,axios,uniapp}` |
-| 内置拦截器 | `./src/interceptors/{auth,request-id,unwrap,logger}` |
-| 装饰器 | `./src/enhancers/{retry,dedupe}` |
+| `fetchAdapter` / 内置拦截器 / 装饰器 | `./src`（零依赖，任何端；也可从各自子路径导入） |
+| `axiosAdapter` / `uniappAdapter` | `./src/adapters/{axios,uniapp}`（分别耦合 axios 依赖与 `uni` 全局） |
 
 ## API 参考
 
@@ -169,8 +171,7 @@ DELETE）或自定义动词时，在业务层组合自己的 client 对象——
 
 ```ts
 // src/api.ts —— 团队实际消费的入口
-import { createRequest } from './src'
-import { fetchAdapter } from './src/adapters/fetch'
+import { createRequest, fetchAdapter } from './src'
 
 const base = createRequest({ adapter: fetchAdapter, baseURL: 'https://api.example.com' })
 
@@ -551,7 +552,7 @@ http.interceptors.request.use((config) => ({
 
 | 决策 | 原因 |
 | --- | --- |
-| 主入口零依赖，插件按需导入 | 依赖各自携带，未被 import 的模块不进 bundle；小程序包体积与平台耦合由结构保证，而非约定 |
+| 平台耦合插件不进门面（`sideEffects: false`） | axios / uniapp 适配器必须从子路径导入，axios 进不了小程序包；零依赖插件（fetch/拦截器/装饰器）从门面直出，常用场景一行 import |
 | 适配器只返回 `RawResponse`，不做任何判断 | 404/500 在两端表现不同（axios 抛错、uni 走 success），统一 resolve 交给 core 判 2xx，是三端语义归一的支点 |
 | params 在 core 拼成完整 URL | 三端行为完全一致（数组重复 key、跳过 null/undefined、encode 规则），适配器保持"哑" |
 | 取消统一为 `name='AbortError'` 的 Error | uni-app 非 H5 运行时（小程序/App 端）没有 `DOMException`；`e.name === 'AbortError'` 的判定方式各端兼容 |
