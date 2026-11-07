@@ -165,6 +165,9 @@ const http = createRequest({ adapter: myAdapter })
 平台特有方法（如小程序的 `uploadFile`）通过 `.extend()` 附加到适配器上，附加方法可经过完整
 管道；错误链、事件、透传的用法见 [API 文档](https://github.com/huangqi-an/request/blob/main/docs/api.md)。
 
+平台差异：三个适配器的超时与取消行为一致；上传进度 fetch 不支持；PATCH 在微信小程序受
+`wx.request` 方法白名单限制。详见[能力矩阵](https://github.com/huangqi-an/request/blob/main/docs/api.md#能力矩阵)。
+
 ## License
 
 [MIT](./LICENSE)
