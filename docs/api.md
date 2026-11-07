@@ -2,6 +2,8 @@
 
 [返回 README](../README.md)
 
+导入：零依赖能力（`createRequest` / `fetchAdapter` / 内置拦截器 / 装饰器 / 类型 / 错误）均从主入口 `@huangqi_an/request` 导入；`axiosAdapter`（依赖 axios）与 `uniappAdapter`（依赖全局 `uni`）从 `@huangqi_an/request/adapters/{axios,uniapp}` 子路径导入。`sideEffects: false`，未使用的模块不参与打包。
+
 ## 目录
 
 - [createRequest(options)](#createrequestoptions)
@@ -220,8 +222,8 @@ http.interceptors.error.use(logger.error)
 
 ```ts
 import { axiosAdapter } from '@huangqi_an/request/adapters/axios'
-import { withRetry } from '@huangqi_an/request/enhancers/retry'
-import { withDedupe } from '@huangqi_an/request/enhancers/dedupe'
+import { withRetry } from '@huangqi_an/request'
+import { withDedupe } from '@huangqi_an/request'
 
 const adapter = axiosAdapter.use(withDedupe()).use(withRetry({ retries: 2 }))
 const http = createRequest({ adapter })
@@ -234,7 +236,7 @@ const http = createRequest({ adapter })
 失败自动重试。与错误链恢复不同，重试成功的响应会经过完整管道（含响应链拦截器）。
 
 ```ts
-import { withRetry } from '@huangqi_an/request/enhancers/retry'
+import { withRetry } from '@huangqi_an/request'
 
 const adapter = fetchAdapter.use(withRetry({ retries: 2, delayMs: (n) => n * 300 }))
 ```
@@ -253,7 +255,7 @@ const adapter = fetchAdapter.use(withRetry({ retries: 2, delayMs: (n) => n * 300
 进行中的相同请求共享同一个 Promise，请求结束后自动清理。默认仅对幂等方法生效。
 
 ```ts
-import { withDedupe } from '@huangqi_an/request/enhancers/dedupe'
+import { withDedupe } from '@huangqi_an/request'
 
 const adapter = fetchAdapter.use(withDedupe())                               // GET 去重
 const antiDoubleSubmit = fetchAdapter.use(withDedupe({ methods: ['POST'] })) // 防止双击重复提交
@@ -306,7 +308,7 @@ const antiDoubleSubmit = fetchAdapter.use(withDedupe({ methods: ['POST'] })) // 
 
 ```ts
 // #ifdef H5
-import { fetchAdapter } from '@huangqi_an/request/adapters/fetch'
+import { fetchAdapter } from '@huangqi_an/request'
 export const http = createRequest({ adapter: fetchAdapter })
 // #endif
 // #ifdef MP-WEIXIN
@@ -345,7 +347,7 @@ const http = createRequest({ adapter: myAdapter.use(withRetry()) })
 
 ```ts
 import { uniappAdapter } from '@huangqi_an/request/adapters/uniapp'
-import { withRetry } from '@huangqi_an/request/enhancers/retry'
+import { withRetry } from '@huangqi_an/request'
 
 const mp = uniappAdapter
   .use(withRetry({ methods: ['GET', 'POST'] }))

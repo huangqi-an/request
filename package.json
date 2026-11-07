@@ -10,18 +10,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./core": {
-      "types": "./dist/core.d.ts",
-      "import": "./dist/core.js"
-    },
-    "./errors": {
-      "types": "./dist/errors.d.ts",
-      "import": "./dist/errors.js"
-    },
-    "./adapters/fetch": {
-      "types": "./dist/adapters/fetch.d.ts",
-      "import": "./dist/adapters/fetch.js"
-    },
     "./adapters/axios": {
       "types": "./dist/adapters/axios.d.ts",
       "import": "./dist/adapters/axios.js"
@@ -29,34 +17,6 @@
     "./adapters/uniapp": {
       "types": "./dist/adapters/uniapp.d.ts",
       "import": "./dist/adapters/uniapp.js"
-    },
-    "./interceptors": {
-      "types": "./dist/interceptors/index.d.ts",
-      "import": "./dist/interceptors/index.js"
-    },
-    "./interceptors/auth": {
-      "types": "./dist/interceptors/auth.d.ts",
-      "import": "./dist/interceptors/auth.js"
-    },
-    "./interceptors/request-id": {
-      "types": "./dist/interceptors/request-id.d.ts",
-      "import": "./dist/interceptors/request-id.js"
-    },
-    "./interceptors/unwrap": {
-      "types": "./dist/interceptors/unwrap.d.ts",
-      "import": "./dist/interceptors/unwrap.js"
-    },
-    "./interceptors/logger": {
-      "types": "./dist/interceptors/logger.d.ts",
-      "import": "./dist/interceptors/logger.js"
-    },
-    "./enhancers/retry": {
-      "types": "./dist/enhancers/retry.d.ts",
-      "import": "./dist/enhancers/retry.js"
-    },
-    "./enhancers/dedupe": {
-      "types": "./dist/enhancers/dedupe.d.ts",
-      "import": "./dist/enhancers/dedupe.js"
     },
     "./package.json": "./package.json"
   },
