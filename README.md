@@ -83,6 +83,29 @@ http.interceptors.response.use(createUnwrapInterceptor())
 | `createUnwrapInterceptor` | 剥离 `{code, data, message}` 业务壳，业务码失败抛 `kind: 'business'` |
 | `createLoggerInterceptors` | 三链日志 |
 
+自定义拦截器就是一个符合链签名的函数，无需任何注册 API 之外的封装：
+
+```ts
+// 请求链：入参 config，返回改写后的 config（可异步）
+http.interceptors.request.use((config) => ({
+  ...config,
+  headers: { ...config.headers, 'X-Locale': 'zh-CN' },
+}))
+
+// 响应链：入参 RawResponse，返回 RawResponse；抛出的错误进入错误链
+http.interceptors.response.use((res) => {
+  if (res.status === 204) return { ...res, data: null }
+  return res
+})
+
+// 错误链：入参 RequestError。返回 undefined 表示放行，返回 RawResponse 表示恢复
+http.interceptors.error.use((err) => {
+  if (err.kind === 'network') notify('网络异常')
+})
+```
+
+各选项与完整语义见 [API 文档 · 拦截器](https://github.com/huangqi-an/request/blob/main/docs/api.md#拦截器)。
+
 ## 装饰器
 
 通过 `adapter.use()` 叠加，注册顺序即请求经过顺序。
@@ -96,6 +119,23 @@ http.interceptors.response.use(createUnwrapInterceptor())
 const adapter = fetchAdapter.use(withDedupe()).use(withRetry({ retries: 2 }))
 ```
 
+自定义装饰器实现 `AdapterEnhancer` 类型——一个"接收适配器、返回适配器"的函数：
+
+```ts
+import type { AdapterEnhancer } from '@huangqi_an/request'
+
+const withTiming: AdapterEnhancer = (adapter) => async (config) => {
+  const start = Date.now()
+  const res = await adapter(config)
+  console.log(`${config.method} ${config.url} ${Date.now() - start}ms`)
+  return res
+}
+
+const adapter = fetchAdapter.use(withTiming)
+```
+
+完整选项与语义见 [API 文档 · 适配器装饰器](https://github.com/huangqi-an/request/blob/main/docs/api.md#适配器装饰器)。
+
 ## 适配器
 
 | 适配器 | 依赖 | 适用 |
@@ -105,8 +145,25 @@ const adapter = fetchAdapter.use(withDedupe()).use(withRetry({ retries: 2 }))
 | `uniappAdapter` | 全局 `uni` | uni-app（H5 / 小程序 / App），从 `@huangqi_an/request/adapters/uniapp` 导入 |
 | 自定义 | — | wx 原生小程序、Taro、Electron 等，按契约实现 |
 
-平台差异：三个适配器的超时与取消行为一致；上传进度 fetch 不支持；PATCH 在微信小程序受
-`wx.request` 方法白名单限制。详见[能力矩阵](https://github.com/huangqi-an/request/blob/main/docs/api.md#能力矩阵)。
+自定义适配器契约共三条：
+
+1. 入参为 `RequestConfig`，其中 `url` 已拼接完成，是完整地址。
+2. 返回 `RawResponse`（`status` / `data` / `headers`），任意状态码都 resolve，状态码判定由 core 负责。
+3. 取消时抛出 `name='AbortError'` 的错误；其余错误直接抛出，core 统一包装为 `kind: 'network'`。
+
+```ts
+import { defineAdapter } from '@huangqi_an/request'
+
+const myAdapter = defineAdapter(async (config) => {
+  const res = await myTransport.request(config.url, config)
+  return { status: res.status, data: res.body, headers: res.headers }
+})
+
+const http = createRequest({ adapter: myAdapter })
+```
+
+平台特有方法（如小程序的 `uploadFile`）通过 `.extend()` 附加到适配器上，附加方法可经过完整
+管道；错误链、事件、透传的用法见 [API 文档](https://github.com/huangqi-an/request/blob/main/docs/api.md)。
 
 ## License
 
