@@ -72,6 +72,15 @@ describe('axiosAdapter（真实 axios → 本地 http server）', () => {
     expect(res.data).toMatchObject({ body: { a: 1 } })
   })
 
+  it('GET 忽略 data（与 fetchAdapter 对齐：query 请用 params）', async () => {
+    const res = await axiosAdapter({
+      url: `${baseURL}/echo`,
+      method: 'GET',
+      data: { ignored: true },
+    })
+    expect((res.data as { body: string }).body).toBe('')
+  })
+
   it('core + axiosAdapter 整链：404 → RequestError(kind=http)', async () => {
     const http = createRequest({ adapter: axiosAdapter, baseURL })
     const err = await http.get('/404').catch((e) => e)

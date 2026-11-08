@@ -22,14 +22,16 @@ function toProgress(loaded: number, total?: number | null): RequestProgress {
  */
 export const axiosAdapter = defineAdapter(async (config: RequestConfig) => {
   const { uploadProgress, downloadProgress } = config.on ?? {}
+  const method = config.method ?? 'GET'
   try {
     const res = await axios.request({
       // 专有配置先展开（如 adapter: 'fetch'）：契约派生字段在后覆盖，
       // url/method/headers/timeout/signal/validateStatus 始终以 RequestConfig 为准
       ...(config.adapterOptions?.axios as AxiosRequestConfig | undefined),
       url: config.url,
-      method: config.method ?? 'GET',
-      data: config.data,
+      method,
+      // 与 fetchAdapter 对齐：GET/HEAD 忽略 data（query 请用 params）
+      data: method === 'GET' || method === 'HEAD' ? undefined : config.data,
       headers: config.headers,
       timeout: config.timeout,
       signal: config.signal,

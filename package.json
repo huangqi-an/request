@@ -58,6 +58,9 @@
     "type": "git",
     "url": "git+https://github.com/huangqi-an/request.git"
   },
+  "bugs": {
+    "url": "https://github.com/huangqi-an/request/issues"
+  },
   "keywords": [
     "request",
     "http",

@@ -71,7 +71,7 @@ export const api = {
 | `method` | `RequestMethod` | 默认 `'GET'` |
 | `baseURL` | `string` | 请求级覆盖实例级 |
 | `params` | `Record<string, unknown>` | query 参数，由 core 序列化（数组生成重复 key、跳过 null/undefined、encodeURIComponent） |
-| `data` | `unknown` | 请求体；fetchAdapter 对对象/数组自动 JSON 序列化并补充 `Content-Type` |
+| `data` | `unknown` | 请求体；fetchAdapter 对对象/数组自动 JSON 序列化并补充 `Content-Type`。GET/HEAD 的 `data` 被忽略，query 一律使用 `params`（否则 mp 端会被拼进 url，与其它端不一致） |
 | `headers` | `Record<string, string>` | 与实例级浅合并，请求级优先 |
 | `timeout` | `number` | 毫秒 |
 | `signal` | `AbortSignal` | 取消请求 |
@@ -265,6 +265,8 @@ const antiDoubleSubmit = fetchAdapter.use(withDedupe({ methods: ['POST'] })) // 
 | --- | --- | --- |
 | `methods` | `['GET', 'HEAD']` | 参与去重的方法；写方法默认不去重 |
 | `key(config)` | `` `${method} ${url} ${JSON.stringify(data)}` `` | params 已包含在 url 中；data 无法序列化时该请求不参与去重 |
+
+注意：共享的请求使用首个发起方的 `signal`——任一调用者取消都会使共享结果对所有调用者 reject。
 
 ### 幂等性默认值
 
