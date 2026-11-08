@@ -78,7 +78,7 @@ describe('axiosAdapter（真实 axios → 本地 http server）', () => {
       method: 'GET',
       data: { ignored: true },
     })
-    expect((res.data as { body: string }).body).toBe('')
+    expect((res.data as { body: string | null }).body).toBeNull()
   })
 
   it('core + axiosAdapter 整链：404 → RequestError(kind=http)', async () => {
