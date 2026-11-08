@@ -430,3 +430,18 @@ http.interceptors.request.use((config) => ({
   adapterOptions: { ...config.adapterOptions, axios: { adapter: 'fetch' } },
 }))
 ```
+
+## 开发与发布
+
+```bash
+npm install
+npm run test       # vitest，91 个用例
+npm run typecheck  # tsc --noEmit
+npm run build      # tsup，产物输出至 dist/
+```
+
+发布通过 GitHub Actions 手动触发：仓库页 Actions → CD → Run workflow，选择版本方式
+（patch / minor / major / current）。流程自动执行类型检查、测试、版本升级与打 tag、构建、发布。
+
+前提：仓库 Settings → Secrets and variables → Actions 中配置 `NPM_TOKEN`
+（npmjs.com → Access Tokens → 生成 Automation 或 Granular 类型，权限勾选对应包的读写，可绕过 2FA）。

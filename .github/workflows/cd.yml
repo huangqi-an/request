@@ -1,0 +1,71 @@
+name: CD
+
+# 手动发布：Actions 页面 → CD → Run workflow → 选择版本方式
+# 前置：仓库 Settings → Secrets and variables → Actions 配置 NPM_TOKEN
+# （npmjs.com → Access Tokens → 生成 Automation/Granular 类型 token，可绕过 2FA）
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本升级方式（current = 按 package.json 当前版本直接发布）'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - current
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org/'
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: 测试
+        run: npm run test
+
+      - name: 升级版本并打 tag
+        if: inputs.version != 'current'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          npm version ${{ inputs.version }}
+          git push --follow-tags
+
+      - name: 构建
+        run: npm run build
+
+      - name: 检查版本是否已发布
+        id: check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view @huangqi_an/request@$VERSION version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 发布
+        if: steps.check.outputs.exists == 'false'
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
